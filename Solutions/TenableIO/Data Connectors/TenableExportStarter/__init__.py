@@ -22,25 +22,18 @@ from ..constants import *
 # cleanup_orchestrator_function_name = 'TenableCleanUpOrchestrator'
 
 
-async def start_new_orchestrator(
-        client: df.DurableOrchestrationClient,
-        existing_instance_dtls: dict = None,
-        existing_orchestration: df.DurableOrchestrationStatus = None
-):
+async def start_new_orchestrator(client: df.DurableOrchestrationClient, job_info: dict = None):
     stats_table = ExportsTableStore(STORAGE_ACCOUNT_CONNECTION_STRING, STATS_TABLE_NAME)
 
-    if (
-        any([all([existing_instance_dtls, existing_orchestration]),
-             all([not existing_instance_dtls, not existing_orchestration])])
-    ):
-        raise Exception('Either both instance and orchestration details should be passed or none.')
+    if job_info:
+        current_job_status = job_info['currentJobStatus']
+        export_instance_id = job_info['exportsInstanceId']
+        last_synced_timestamp = job_info['lastSyncedTimestamp']
+        current_job_start_timestamp = job_info['currentJobStartTimestamp']
+        current_job_sub_status = job_info.get('currentJobSubStatus', '')
+        current_job_end_timestamp = job_info.get('currentJobEndTimestamp', None)
 
-    if existing_instance_dtls:
-        last_synced_timestamp = existing_instance_dtls['lastSyncedTimestamp']
-        current_job_start_timestamp = existing_instance_dtls['currentJobStartTimestamp']
-        current_job_end_timestamp = existing_instance_dtls['currentJobEndTimestamp']
-        current_job_status = existing_instance_dtls['currentJobStatus']
-        current_job_sub_status = existing_instance_dtls['currentJobSubStatus']
+        existing_orchestration = await client.get_status(export_instance_id)
         current_orchestration_status = existing_orchestration.runtime_status
         export_frequency = EXPORT_SCHEDULE_MINUTES * 60
 
@@ -64,8 +57,16 @@ async def start_new_orchestrator(
                     ORCHESTRATOR_FUNCTION_NAME, None,
                     {'startTimestamp': last_synced_timestamp + 1}
                 )
+
+                stats_table.merge('main', 'current', {
+                    'exportsInstanceId': instance_id,
+                    'currentJobStartTimestamp': time.time(),
+                    'currentJobStatus': TenableJobStatus.pending
+                })
             else:
                 logging.info(f'Waiting period on. Will wait for ${time_to_wait} seconds before starting new job.')
+
+                return None
         else:
             assert current_job_status in JOB_ACTIVE_STATUSES, 'Expecting job to be active when orchestration is running.'
 
@@ -80,35 +81,58 @@ async def start_new_orchestrator(
 
                 #   update the job status to cancelled along with timestamp dtls
                 stats_table.merge('main', 'current', {
-                    'currentJobEndTimestamp': time.time()
+                    'currentJobEndTimestamp': time.time(),
                     'currentJobStatus': TenableJobStatus.canceled
                 })
             else:
                 # wait for running job to geet finish.
                 logging.info(f'Current job running. Will wait for ${time_to_wait} seconds before starting new job.')
 
-        # if job is running
-        #   if max time has elapesed
-        #       cancel the job
-        #       update the job status to cancelled along with timestamp dtls
-        # elif job has been terminated
+            return None
     else:
-        instance_id = await client.start_new(ORCHESTRATOR_FUNCTION_NAME, None, {'startTimestamp': start_timestamp})
+        instance_id = await client.start_new(
+            ORCHESTRATOR_FUNCTION_NAME, None, { 'startTimestamp': 0 }
+        )
 
-    logging.info(f"Started orchestration with ID = '{instance_id}'.")
-    stats_table.merge('main', 'current', {
-        'exportsInstanceId': instance_id
-    })
+        stats_table.merge('main', 'current', {
+            'exportsInstanceId': instance_id,
+            'currentJobStartTimestamp': time.time(),
+            'currentJobStatus': TenableJobStatus.pending,
+            'lastSyncedTimestamp': -1 # indicator that data hasn't yet not synced even once.
+        })
+
+    # logging.info(f"Started orchestration with ID = '{instance_id}'.")
+    # stats_table.merge('main', 'current', {
+    #     'exportsInstanceId': instance_id
+    # })
     return instance_id
 
 
-async def start_new_cleanup_orchestrator(client):
+async def start_new_cleanup_orchestrator(client, job_info: dict = None):
     stats_table = ExportsTableStore(STORAGE_ACCOUNT_CONNECTION_STRING, STATS_TABLE_NAME)
-    instance_id = await client.start_new(CLEANUP_ORCHESTRATOR_FUNCTION_NAME, None, None)
-    logging.info(f"Started clean up orchestration with ID = '{instance_id}'.")
-    stats_table.merge('main', 'current', {
-        'cleanupInstanceId': instance_id
-    })
+
+    cleanup_instance_id = job_info.get('cleanupInstanceId') if job_info else None
+    if cleanup_instance_id:
+        existing_cleanup_instance = await client.get_status(cleanup_instance_id)
+        existing_status = existing_cleanup_instance.runtime_status
+
+        if existing_status in ORCHESTRATOR_TERMINAL_STATUSES:
+            instance_id = await client.start_new(CLEANUP_ORCHESTRATOR_FUNCTION_NAME, None, None)
+
+            stats_table.merge('main', 'current', {
+                'cleanupInstanceId': instance_id
+            })
+        else:
+            logging.info(f'Cleanup orchestrator is in {existing_status}')
+
+            return None
+    else:
+        instance_id = await client.start_new(CLEANUP_ORCHESTRATOR_FUNCTION_NAME, None, None)
+
+        logging.info(f"Started clean up orchestration with ID = '{instance_id}'.")
+        stats_table.merge('main', 'current', {
+            'cleanupInstanceId': instance_id
+        })
     return instance_id
 
 
@@ -161,64 +185,70 @@ async def main(mytimer: func.TimerRequest, starter: str) -> None:
     logging.info(job_info)
 
     if job_info is not None:
-        logging.info('checking if an existing export instance is present in db...')
+        # logging.info('checking if an existing export instance is present in db...')
 
-        export_instance_id = job_info.get('exportsInstanceId', '')
-        logging.info(f'exports instance id value: {export_instance_id}')
+        # export_instance_id = job_info.get('exportsInstanceId', '')
+        # logging.info(f'exports instance id value: {export_instance_id}')
 
-        if not export_instance_id == '':
-            logging.info(f'Located an existing exports orchestrator instance: {export_instance_id}')
+        # if not export_instance_id == '':
+        #     logging.info(f'Located an existing exports orchestrator instance: {export_instance_id}')
 
-            existing_instance = await client.get_status(export_instance_id)
+        #     existing_instance = await client.get_status(export_instance_id)
 
-            logging.info(f'Existing instance details: {existing_instance}, status: {existing_instance.runtime_status}')
+        #     logging.info(f'Existing instance details: {existing_instance}, status: {existing_instance.runtime_status}')
 
-            if existing_instance is None or existing_instance.runtime_status in ORCHESTRATOR_TERMINAL_STATUSES:
-                # check if time to wait has elapsed
-                # if yes then
-                #   trigger new run
-                new_instance_id = await start_new_orchestrator(client)
-                logging.info(f'started new instance -- {new_instance_id}')
-            else:
-                logging.info(
-                    'Export job is already currently running. Will try again later.')
-                # check if max allowed time to run job has reached
-                # if yes
-                #   cancel the job
-                #   start new job
-                # else
-                #   wait for the job get finished
-        else:
-            logging.info('not a first run, but no instance id found yet.')
-            logging.info('starting new instance id.')
-            new_instance_id = await start_new_orchestrator(client)
-            logging.info(f'started new instance -- {new_instance_id}')
+        #     if existing_instance is None or existing_instance.runtime_status in ORCHESTRATOR_TERMINAL_STATUSES:
+        #         # check if time to wait has elapsed
+        #         # if yes then
+        #         #   trigger new run
+        #         new_instance_id = await start_new_orchestrator(client, job_info, existing_instance)
+        #         logging.info(f'started new instance -- {new_instance_id}')
+        #     else:
+        #         logging.info(
+        #             'Export job is already currently running. Will try again later.')
+        #         # check if max allowed time to run job has reached
+        #         # if yes
+        #         #   cancel the job
+        #         #   start new job
+        #         # else
+        #         #   wait for the job get finished
+        # else:
+        #     logging.info('not a first run, but no instance id found yet.')
+        #     logging.info('starting new instance id.')
+        #     new_instance_id = await start_new_orchestrator(client)
+        #     logging.info(f'started new instance -- {new_instance_id}')
+        instance_id = await start_new_orchestrator(client, job_info)
+        if instance_id:
+            logging.info(f'started new exports orchestrator instance -- {instance_id}')
 
-        logging.info('checking for an existing cleanup instance was found...')
-        cleanup_singleton_instance_id = job_info['cleanupInstanceId'] if 'cleanupInstanceId' in job_info else ''
-        if not cleanup_singleton_instance_id == '':
-            logging.info(
-                f'Located an existing cleanup orchestrator instance: {cleanup_singleton_instance_id}')
-            existing_cleanup_instance = await client.get_status(cleanup_singleton_instance_id)
-            logging.info(existing_cleanup_instance)
-            logging.info(existing_cleanup_instance.runtime_status)
-            if existing_cleanup_instance is None or existing_cleanup_instance.runtime_status in [
-                df.OrchestrationRuntimeStatus.Completed, df.OrchestrationRuntimeStatus.Failed,
-                df.OrchestrationRuntimeStatus.Terminated, None]:
-                new_cleanup_instance_id = await start_new_cleanup_orchestrator(client)
-                logging.info(
-                    f'started new instance -- {new_cleanup_instance_id}')
-            else:
-                logging.info(
-                    'Cleanup job is already currently running. Will try again later.')
-        else:
-            logging.info(
-                'not a first run, but no cleanup instance id found yet.')
-            logging.info('starting new cleanup instance id.')
-            cleanup_new_instance_id = await start_new_cleanup_orchestrator(client)
-            logging.info(f'started new instance -- {cleanup_new_instance_id}')
+        # logging.info('checking for an existing cleanup instance was found...')
+        # cleanup_singleton_instance_id = job_info['cleanupInstanceId'] if 'cleanupInstanceId' in job_info else ''
+        # if not cleanup_singleton_instance_id == '':
+        #     logging.info(
+        #         f'Located an existing cleanup orchestrator instance: {cleanup_singleton_instance_id}')
+        #     existing_cleanup_instance = await client.get_status(cleanup_singleton_instance_id)
+        #     logging.info(existing_cleanup_instance)
+        #     logging.info(existing_cleanup_instance.runtime_status)
+        #     if existing_cleanup_instance is None or existing_cleanup_instance.runtime_status in [
+        #         df.OrchestrationRuntimeStatus.Completed, df.OrchestrationRuntimeStatus.Failed,
+        #         df.OrchestrationRuntimeStatus.Terminated, None]:
+        #         new_cleanup_instance_id = await start_new_cleanup_orchestrator(client)
+        #         logging.info(
+        #             f'started new instance -- {new_cleanup_instance_id}')
+        #     else:
+        #         logging.info(
+        #             'Cleanup job is already currently running. Will try again later.')
+        # else:
+        #     logging.info(
+        #         'not a first run, but no cleanup instance id found yet.')
+        #     logging.info('starting new cleanup instance id.')
+        #     cleanup_new_instance_id = await start_new_cleanup_orchestrator(client)
+        #     logging.info(f'started new instance -- {cleanup_new_instance_id}')
+        cleanup_new_instance_id = await start_new_cleanup_orchestrator(client, job_info)
+        if instance_id:
+            logging.info(f'started new cleanup orchestrator instance -- {cleanup_new_instance_id}')
     else:
         first_run_setup()
-        await start_new_orchestrator(client, True)
+        await start_new_orchestrator(client)
         await start_new_cleanup_orchestrator(client)
         return
