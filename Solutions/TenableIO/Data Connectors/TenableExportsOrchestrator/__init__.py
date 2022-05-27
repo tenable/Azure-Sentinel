@@ -1,6 +1,4 @@
 import logging
-import os
-from datetime import timedelta, datetime, timezone
 from time import time
 
 import azure.functions as func
@@ -9,15 +7,6 @@ import azure.durable_functions as df
 from ..exports_store import ExportsTableStore, TenableStatus
 from ..tenable_helper import TenableExportType, TenableJobSubStatus, TenableJobStatus
 from ..constants import *
-
-#connection_string = os.environ['AzureWebJobsStorage']
-#stats_table_name = ExportsTableNames.TenableExportStatsTable.value
-#export_schedule_minutes = int(
-#    os.getenv('TenableExportScheduleInMinutes', '1440'))
-#start_asset_job_name = 'TenableStartAssetExportJob'
-#start_vuln_job_name = 'TenableStartVulnExportJob'
-#asset_orchestrator_name = 'TenableAssetExportOrchestrator'
-#vuln_orchestrator_name = 'TenableVulnExportOrchestrator'
 
 
 def orchestrator_function(context: df.DurableOrchestrationContext):
@@ -147,11 +136,6 @@ def orchestrator_function(context: df.DurableOrchestrationContext):
                 'lastSyncedTimestamp': last_synced_timestamp
             }
         )
-
-    # next_check = context.current_utc_datetime + \
-    #     timedelta(minutes=EXPORT_SCHEDULE_MINUTES)
-    # yield context.create_timer(next_check)
-    # context.continue_as_new(None)
 
 
 main = df.Orchestrator.create(orchestrator_function)
