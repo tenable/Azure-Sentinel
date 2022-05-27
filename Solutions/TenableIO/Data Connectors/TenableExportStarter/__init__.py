@@ -76,9 +76,10 @@ async def start_new_orchestrator(client: df.DurableOrchestrationClient, job_info
 
                 if time_to_wait <= 0:
                     try:
+                        logging.info('Trying to terminate existing job as max-wait-time has elapsed.')
                         await client.terminate(existing_orchestration.instance_id, f'Waited for maximum allowed time: {export_frequency}')
                     except Exception as exc:
-                        logging.error('An error has occured while terminiate orchestration %s', existing_orchestration.instance_id)
+                        logging.error('An error has occurred while terminate orchestration %s', existing_orchestration.instance_id)
                         logging.exception(exc)
 
                     instance_id = await start_and_save_new_export_orchestration(client, stats_table, last_synced_timestamp)
@@ -107,7 +108,9 @@ async def start_new_orchestrator(client: df.DurableOrchestrationClient, job_info
 
             if current_orchestration_status in ORCHESTRATOR_TERMINAL_STATUSES:
                 # expecting that job status in TERMINAL STATUS
-                assert current_job_status in JOB_TERMINAL_STATUSES, 'Expecting job to be terminated when orchestration finished.'
+                if current_job_status not in JOB_TERMINAL_STATUSES:
+                    logging.warning('Expecting job to be terminated when orchestration finished.')
+
                 time_elapsed_since_job_completion = time.time() - current_job_end_timestamp
                 time_to_wait = export_frequency - time_elapsed_since_job_completion
 
@@ -128,22 +131,28 @@ async def start_new_orchestrator(client: df.DurableOrchestrationClient, job_info
 
                     return None
             else:
-                assert current_job_status in JOB_ACTIVE_STATUSES, 'Expecting job to be active when orchestration is running.'
+                if current_job_status not in JOB_ACTIVE_STATUSES:
+                    logging.warning('Expecting job to be active when orchestration is running.')
 
                 time_elapsed_since_job_start = time.time() - current_job_start_timestamp
                 time_to_wait = export_frequency - time_elapsed_since_job_start
 
                 # if max time has elapsed
                 if time_to_wait <= 0:
-                    # TODO: Handle errors while terminate orchestration instance.
-                    #   cancel the job
-                    await client.terminate(existing_orchestration.instance_id, f'Waited for maximum allowed time: {export_frequency}')
+                    try:
+                        logging.info('Updating currentJobStatus to canceled status.')
+                        #   update the job status to cancelled along with timestamp dtls
+                        stats_table.merge('main', 'current', {
+                            'currentJobEndTimestamp': time.time(),
+                            'currentJobStatus': TenableJobStatus.canceled.value
+                        })
 
-                    #   update the job status to cancelled along with timestamp dtls
-                    stats_table.merge('main', 'current', {
-                        'currentJobEndTimestamp': time.time(),
-                        'currentJobStatus': TenableJobStatus.canceled.value
-                    })
+                        logging.warning('Trying to terminate orchestration %s', existing_orchestration.instance_id)
+                        #   cancel the job
+                        await client.terminate(existing_orchestration.instance_id, f'Waited for maximum allowed time: {export_frequency}')
+                    except Exception as exc:
+                        logging.error('An error has occurred while terminate orchestration %s', existing_orchestration.instance_id)
+                        logging.exception(exc)
                 else:
                     # wait for running job to geet finish.
                     logging.info(f'Current job running. Will wait for ${time_to_wait} seconds before starting new job.')

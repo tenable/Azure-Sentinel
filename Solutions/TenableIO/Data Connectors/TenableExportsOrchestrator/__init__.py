@@ -39,7 +39,7 @@ def orchestrator_function(context: df.DurableOrchestrationContext):
         logging.warning(
             f'instance id: f{context.instance_id} working with asset export job {asset_export_job_id}, sending to sub orchestrator')
 
-        stats_store.merge('main', 'current', {'currentJobStatus': TenableJobSubStatus.asset_export_started.value})
+        stats_store.merge('main', 'current', {'currentJobStatus': TenableJobStatus.running.value})
         stats_store.merge(asset_export_job_id, 'prime', {
             'status': TenableStatus.processing.value,
             'exportType': TenableExportType.asset.value,
@@ -59,7 +59,7 @@ def orchestrator_function(context: df.DurableOrchestrationContext):
         logging.warn(
             f'instance id: f{context.instance_id} working with vuln export job {vuln_export_job_id}, sending to sub orchestrator')
 
-        stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.vuln_export_started })
+        stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.vuln_export_started.value })
         stats_store.merge(vuln_export_job_id, 'prime', {
             'status': TenableStatus.processing.value,
             'exportType': TenableExportType.vuln.value,
@@ -105,10 +105,10 @@ def orchestrator_function(context: df.DurableOrchestrationContext):
                     'totalChunksCount': len(chunks)
                 })
 
-            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.asset_export_finished })
+            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.asset_export_finished.value })
         except IndexError as e:
             logging.warn('asset job returned no results')
-            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.asset_export_failed })
+            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.asset_export_failed.value })
             raise e
 
         try:
@@ -123,11 +123,11 @@ def orchestrator_function(context: df.DurableOrchestrationContext):
                     'chunks': chunk_ids,
                     'totalChunksCount': len(chunks)
                 })
-            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.vuln_export_finished })
+            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.vuln_export_finished.value })
 
         except IndexError as e:
             logging.warn('vuln job returned no results')
-            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.vuln_export_failed })
+            stats_store.merge('main', 'current', { 'currentJobSubStatus': TenableJobSubStatus.vuln_export_failed.value })
             raise e
     except Exception as exc:
         logging.exception(exc)
