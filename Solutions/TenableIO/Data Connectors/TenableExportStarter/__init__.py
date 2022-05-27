@@ -5,10 +5,11 @@ import azure.functions as func
 import azure.durable_functions as df
 
 from datetime import datetime, timedelta, timezone
-from ..exports_store import ExportsTableStore, ExportsTableNames
+from ..exports_store import ExportsTableStore
 from ..exports_queue import ExportsQueue, ExportsQueueNames
 from ..utils import bootstrap_checks
 from ..constants import *
+from ..tenable_helper import TenableJobStatus
 
 
 # connection_string = os.environ['AzureWebJobsStorage']
@@ -21,85 +22,147 @@ from ..constants import *
 # orchestrator_function_name = 'TenableExportsOrchestrator'
 # cleanup_orchestrator_function_name = 'TenableCleanUpOrchestrator'
 
+JOB_ACTIVE_STATUSES = [
+    TenableJobStatus.pending.value,
+    TenableJobStatus.running.value
+]
+
+JOB_TERMINAL_STATUSES = [
+    TenableJobStatus.completed.value,
+    TenableJobStatus.failed.value,
+    TenableJobStatus.canceled.value
+]
+
+
+async def start_and_save_new_export_orchestration(
+    client: df.DurableOrchestrationClient,
+    stats_table: ExportsTableStore,
+    last_synced_timestamp: float
+) -> str:
+    instance_id = await client.start_new(
+        ORCHESTRATOR_FUNCTION_NAME, None, { 'startTimestamp': last_synced_timestamp + 1 }
+    )
+
+    stats_table.merge('main', 'current', {
+        'exportsInstanceId': instance_id,
+        'currentJobStartTimestamp': time.time(),
+        'currentJobStatus': TenableJobStatus.pending.value,
+        'lastSyncedTimestamp': last_synced_timestamp  # indicator that data hasn't yet not synced even once.
+    })
+
+    return instance_id
+
 
 async def start_new_orchestrator(client: df.DurableOrchestrationClient, job_info: dict = None):
     stats_table = ExportsTableStore(STORAGE_ACCOUNT_CONNECTION_STRING, STATS_TABLE_NAME)
 
     if job_info:
-        current_job_status = job_info['currentJobStatus']
         export_instance_id = job_info['exportsInstanceId']
-        last_synced_timestamp = job_info['lastSyncedTimestamp']
-        current_job_start_timestamp = job_info['currentJobStartTimestamp']
-        current_job_sub_status = job_info.get('currentJobSubStatus', '')
-        current_job_end_timestamp = job_info.get('currentJobEndTimestamp', None)
-
-        existing_orchestration = await client.get_status(export_instance_id)
-        current_orchestration_status = existing_orchestration.runtime_status
+        current_job_status = job_info.get('currentJobStatus')
         export_frequency = EXPORT_SCHEDULE_MINUTES * 60
+        # handling edge case where currentJobStatus and other new fields are not
+        # present in table due to old table schema.
+        if not current_job_status:
+            existing_orchestration = await client.get_status(export_instance_id)
+            current_orchestration_status = existing_orchestration.runtime_status
+            current_time = time.mktime(datetime.now().timetuple())
+            last_synced_timestamp = current_time - (60 * 60 * 24)
 
-        logging.info('*********** Current Job details *************')
-        logging.info(f'lastSyncedTimestamp: {last_synced_timestamp}')
-        logging.info(f'currentJobStartTimestamp: {current_job_start_timestamp}')
-        logging.info(f'currentJobEndTimestamp: {current_job_end_timestamp}')
-        logging.info(f'currentJobStatus: {current_job_status}')
-        logging.info(f'currentJobSubStatus: {current_job_sub_status}')
-        logging.info(f'orchestrationStatus: {current_orchestration_status}')
-        logging.info(f'exportFrequency: {export_frequency}')
+            # wait for sometime for current running orchestration to finish,
+            # before cancelling it
+            if current_orchestration_status not in ORCHESTRATOR_TERMINAL_STATUSES:
+                created_time = time.mktime(existing_orchestration.created_time.timetuple())
+                time_to_wait = export_frequency - (current_time - created_time)
 
-        if current_orchestration_status in ORCHESTRATOR_TERMINAL_STATUSES:
-            # expecting that job status in TERMINAL STATUS
-            assert current_job_status in JOB_TERMINAL_STATUSES, 'Expecting job to be terminated when orchestration finished.'
-            time_elapsed_since_job_completion = time.time() - current_job_end_timestamp
-            time_to_wait = export_frequency - time_elapsed_since_job_completion
+                if time_to_wait <= 0:
+                    try:
+                        await client.terminate(existing_orchestration.instance_id, f'Waited for maximum allowed time: {export_frequency}')
+                    except Exception as exc:
+                        logging.error('An error has occured while terminiate orchestration %s', existing_orchestration.instance_id)
+                        logging.exception(exc)
 
-            if time_to_wait <= 0:
-                instance_id = await client.start_new(
-                    ORCHESTRATOR_FUNCTION_NAME, None,
-                    {'startTimestamp': last_synced_timestamp + 1}
-                )
-
-                stats_table.merge('main', 'current', {
-                    'exportsInstanceId': instance_id,
-                    'currentJobStartTimestamp': time.time(),
-                    'currentJobStatus': TenableJobStatus.pending
-                })
+                    instance_id = await start_and_save_new_export_orchestration(client, stats_table, last_synced_timestamp)
+                else:
+                    logging.info(f'Will wait for {time_to_wait} seconds for current orchestration to finish.')
             else:
-                logging.info(f'Waiting period on. Will wait for ${time_to_wait} seconds before starting new job.')
+                instance_id = await start_and_save_new_export_orchestration(client, stats_table, last_synced_timestamp)
+        else:
+            current_job_status = job_info['currentJobStatus']
+            last_synced_timestamp = job_info['lastSyncedTimestamp']
+            current_job_start_timestamp = job_info['currentJobStartTimestamp']
+            current_job_sub_status = job_info.get('currentJobSubStatus', '')
+            current_job_end_timestamp = job_info.get('currentJobEndTimestamp', None)
+
+            existing_orchestration = await client.get_status(export_instance_id)
+            current_orchestration_status = existing_orchestration.runtime_status
+
+            logging.info('*********** Current Job details *************')
+            logging.info(f'lastSyncedTimestamp: {last_synced_timestamp}')
+            logging.info(f'currentJobStartTimestamp: {current_job_start_timestamp}')
+            logging.info(f'currentJobEndTimestamp: {current_job_end_timestamp}')
+            logging.info(f'currentJobStatus: {current_job_status}')
+            logging.info(f'currentJobSubStatus: {current_job_sub_status}')
+            logging.info(f'orchestrationStatus: {current_orchestration_status}')
+            logging.info(f'exportFrequency: {export_frequency}')
+
+            if current_orchestration_status in ORCHESTRATOR_TERMINAL_STATUSES:
+                # expecting that job status in TERMINAL STATUS
+                assert current_job_status in JOB_TERMINAL_STATUSES, 'Expecting job to be terminated when orchestration finished.'
+                time_elapsed_since_job_completion = time.time() - current_job_end_timestamp
+                time_to_wait = export_frequency - time_elapsed_since_job_completion
+
+                if time_to_wait <= 0:
+                    # instance_id = await client.start_new(
+                    #     ORCHESTRATOR_FUNCTION_NAME, None,
+                    #     {'startTimestamp': last_synced_timestamp + 1}
+                    # )
+
+                    # stats_table.merge('main', 'current', {
+                    #     'exportsInstanceId': instance_id,
+                    #     'currentJobStartTimestamp': time.time(),
+                    #     'currentJobStatus': TenableJobStatus.pending
+                    # })
+                    instance_id = await start_and_save_new_export_orchestration(client, stats_table, last_synced_timestamp)
+                else:
+                    logging.info(f'Waiting period on. Will wait for {time_to_wait} seconds before starting new job.')
+
+                    return None
+            else:
+                assert current_job_status in JOB_ACTIVE_STATUSES, 'Expecting job to be active when orchestration is running.'
+
+                time_elapsed_since_job_start = time.time() - current_job_start_timestamp
+                time_to_wait = export_frequency - time_elapsed_since_job_start
+
+                # if max time has elapsed
+                if time_to_wait <= 0:
+                    # TODO: Handle errors while terminate orchestration instance.
+                    #   cancel the job
+                    await client.terminate(existing_orchestration.instance_id, f'Waited for maximum allowed time: {export_frequency}')
+
+                    #   update the job status to cancelled along with timestamp dtls
+                    stats_table.merge('main', 'current', {
+                        'currentJobEndTimestamp': time.time(),
+                        'currentJobStatus': TenableJobStatus.canceled.value
+                    })
+                else:
+                    # wait for running job to geet finish.
+                    logging.info(f'Current job running. Will wait for ${time_to_wait} seconds before starting new job.')
 
                 return None
-        else:
-            assert current_job_status in JOB_ACTIVE_STATUSES, 'Expecting job to be active when orchestration is running.'
-
-            time_elapsed_since_job_start = time.time() - current_job_start_timestamp
-            time_to_wait = export_frequency - time_elapsed_since_job_start
-
-            # if max time has elapsed
-            if time_to_wait <= 0:
-                # TODO: Handle errors while terminate orchestration instance.
-                #   cancel the job
-                await client.terminate(existing_orchestration.instance_id, f'Waited for maximum allowed time: {export_frequency}')
-
-                #   update the job status to cancelled along with timestamp dtls
-                stats_table.merge('main', 'current', {
-                    'currentJobEndTimestamp': time.time(),
-                    'currentJobStatus': TenableJobStatus.canceled
-                })
-            else:
-                # wait for running job to geet finish.
-                logging.info(f'Current job running. Will wait for ${time_to_wait} seconds before starting new job.')
-
-            return None
     else:
-        instance_id = await client.start_new(
-            ORCHESTRATOR_FUNCTION_NAME, None, { 'startTimestamp': 0 }
-        )
+        # instance_id = await client.start_new(
+        #     ORCHESTRATOR_FUNCTION_NAME, None, { 'startTimestamp': 0 }
+        # )
 
-        stats_table.merge('main', 'current', {
-            'exportsInstanceId': instance_id,
-            'currentJobStartTimestamp': time.time(),
-            'currentJobStatus': TenableJobStatus.pending,
-            'lastSyncedTimestamp': -1 # indicator that data hasn't yet not synced even once.
-        })
+        # stats_table.merge('main', 'current', {
+        #     'exportsInstanceId': instance_id,
+        #     'currentJobStartTimestamp': time.time(),
+        #     'currentJobStatus': TenableJobStatus.pending,
+        #     'lastSyncedTimestamp': -1 # indicator that data hasn't yet not synced even once.
+        # })
+
+        #'lastSyncedTimestamp': -1 # indicator that data hasn't yet not synced even once.
+        instance_id = await start_and_save_new_export_orchestration(client, stats_table, -1)
 
     # logging.info(f"Started orchestration with ID = '{instance_id}'.")
     # stats_table.merge('main', 'current', {

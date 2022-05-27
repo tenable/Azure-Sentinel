@@ -4,7 +4,8 @@ import logging
 import azure.functions as func
 
 from ..exports_store import ExportsTableStore, ExportsTableNames
-from ..tenable_helper import TenableIO, TenableStatus, TenableChunkPartitioner
+from ..tenable_helper import TenableIO, TenableChunkPartitioner
+from ..tenable_helper import TenableStatus
 from ..azure_sentinel import AzureSentinel
 from tenable.errors import APIError
 

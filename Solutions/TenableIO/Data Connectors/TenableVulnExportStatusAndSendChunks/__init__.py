@@ -3,7 +3,8 @@ import os
 
 from ..exports_queue import ExportsQueue, ExportsQueueNames
 from ..exports_store import ExportsTableStore, ExportsTableNames
-from ..tenable_helper import TenableIO, TenableStatus, TenableExportType
+from ..tenable_helper import TenableIO
+from ..tenable_helper import TenableStatus, TenableExportType
 
 # from tenable.io import TenableIO
 

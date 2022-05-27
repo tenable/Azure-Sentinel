@@ -3,7 +3,6 @@ import azure.durable_functions as df
 
 from exports_store import ExportsTableNames
 from exports_queue import ExportsQueueNames
-from tenable_helper import TenableJobStatus
 
 
 # env variables
@@ -20,6 +19,10 @@ VULN_QUEUE_NAME = ExportsQueueNames.TenableVulnExportsQueue.value
 # function names
 ORCHESTRATOR_FUNCTION_NAME = 'TenableExportsOrchestrator'
 CLEANUP_ORCHESTRATOR_FUNCTION_NAME = 'TenableCleanUpOrchestrator'
+START_ASSET_FUNCTION_NAME = 'TenableStartAssetExportJob'
+START_VULN_FUNCTION_NAME = 'TenableStartVulnExportJob'
+ASSET_ORCHESTRATOR_FUNCTION_NAME = 'TenableAssetExportOrchestrator'
+VULN_ORCHESTRATOR_FUNCTION_NAME = 'TenableVulnExportOrchestrator'
 
 # other constants
 ORCHESTRATOR_TERMINAL_STATUSES = [
@@ -28,15 +31,4 @@ ORCHESTRATOR_TERMINAL_STATUSES = [
     df.OrchestrationRuntimeStatus.Canceled,
     df.OrchestrationRuntimeStatus.Terminated,
     None
-]
-
-JOB_ACTIVE_STATUSES = [
-    TenableJobStatus.pending,
-    TenableJobStatus.running
-]
-
-JOB_TERMINAL_STATUSES = [
-    TenableJobStatus.completed,
-    TenableJobStatus.failed,
-    TenableJobStatus.canceled
 ]

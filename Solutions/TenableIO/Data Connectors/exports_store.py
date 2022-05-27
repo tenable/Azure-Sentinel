@@ -3,7 +3,7 @@ import logging
 from enum import Enum
 from azure.data.tables import TableClient, UpdateMode
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError, HttpResponseError
-from .tenable_helper import TenableStatus
+from tenable_helper import TenableStatus
 
 
 class ExportsTableStore:
