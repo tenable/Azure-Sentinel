@@ -28,14 +28,14 @@ def orchestrator_function(context: df.DurableOrchestrationContext):
 
     chunks = []
     logging.info(f'checking status of job {vuln_job_id}, outside while loop')
-    job_status = yield context.call_activity(vuln_status_and_chunk, vuln_job_id)
+    job_status = yield context.call_activity(vuln_status_and_chunk, vuln_job_id, context.instance_id, job_details['client'])
 
     logging.info(f'{vuln_job_id} is currently in this state:')
     logging.info(job_status)
     logging.info(job_status['status'])
 
     while not 'status' in job_status or not job_status['status'] == 'COMPLETED':
-        job_status = yield context.call_activity(vuln_status_and_chunk, vuln_job_id)
+        job_status = yield context.call_activity(vuln_status_and_chunk, vuln_job_id, context.instance_id, job_details['client'])
         logging.info(
             f'Checking {vuln_job_id} after waking up again, inside while loop:')
         logging.info(job_status)

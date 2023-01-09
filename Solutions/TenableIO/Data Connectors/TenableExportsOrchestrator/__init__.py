@@ -63,11 +63,11 @@ def orchestrator_function(context: df.DurableOrchestrationContext):
         'jobTimestamp': filter_by_time,
         'startedAt': context.current_utc_datetime.timestamp()
     })
-
     asset_export = context.call_sub_orchestrator(asset_orchestrator_name, {
         'timestamp': filter_by_time,
         'assetJobId': asset_export_job_id,
-        'mainOrchestratorInstanceId': context.instance_id
+        'mainOrchestratorInstanceId': context.instance_id,
+        'client': first_run['client']
     })
     stats_store.merge(asset_export_job_id, 'prime', {
         'status': TenableStatus.sent_to_sub_orchestrator.value

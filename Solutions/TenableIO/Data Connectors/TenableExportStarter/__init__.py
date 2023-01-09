@@ -21,9 +21,9 @@ cleanup_orchestrator_function_name = 'TenableCleanUpOrchestrator'
 async def start_new_orchestrator(client, is_first_run=False):
     stats_table = ExportsTableStore(connection_string, stats_table_name)
     if is_first_run:
-        instance_id = await client.start_new(orchestrator_function_name, None, {'isFirstRun': True})
+        instance_id = await client.start_new(orchestrator_function_name, None, {'isFirstRun': True, 'client': client})
     else:
-        instance_id = await client.start_new(orchestrator_function_name, None, {'isFirstRun': False})
+        instance_id = await client.start_new(orchestrator_function_name, None, {'isFirstRun': False, 'client': client})
     logging.info(f"Started orchestration with ID = '{instance_id}'.")
     stats_table.merge('main', 'current', {
         'exportsInstanceId': instance_id
@@ -97,7 +97,6 @@ async def main(mytimer: func.TimerRequest, starter: str) -> None:
             existing_instance = await client.get_status(singleton_instance_id)
             logging.info(existing_instance)
             logging.info(existing_instance.runtime_status)
-
             if existing_instance is None or existing_instance.runtime_status in [df.OrchestrationRuntimeStatus.Completed, df.OrchestrationRuntimeStatus.Failed, df.OrchestrationRuntimeStatus.Terminated, None]:
                 new_instance_id = await start_new_orchestrator(client)
                 logging.info(f'started new instance -- {new_instance_id}')
