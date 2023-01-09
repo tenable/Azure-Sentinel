@@ -43,6 +43,8 @@ ParserQuery: |
   , EventProductVersion:string
   , DvcIpAddr:string
   , DvcAction:string
+  , DvcDescription:string
+  , DvcSubscriptionId:string
   , Src:string
   , SrcIpAddr:string
   , SrcPortNumber:int
@@ -53,6 +55,7 @@ ParserQuery: |
   , SrcGeoLongitude: real
   , SrcRiskLevel: int
   , SrcHostname: string
+  , SrcDescription:string
   , Hostname: string
   , SrcDomain: string
   , SrcDomainType: string
@@ -67,7 +70,6 @@ ParserQuery: |
   , SrcUsernameType: string
   , SrcUserType: string
   , SrcOriginalUserType: string
-  , SrcUserDomain: string
   , SrcProcessName: string
   , Process: string
   , SrcProcessId: string
@@ -82,6 +84,7 @@ ParserQuery: |
   , DstGeoLongitude: real
   , DstRiskLevel: int
   , DstHostname: string
+  , DstDescription:string
   , DstDomain: string
   , DstDomainType: string
   , DstFQDN: string
@@ -89,6 +92,7 @@ ParserQuery: |
   , DstDvcIdType: string
   , DstDeviceType: string
   , EventSubType:string
+  , EventOriginalSubType:string
   , DnsQuery:string
   , DnsQueryType:int
   , DnsQueryTypeName:string
@@ -108,7 +112,7 @@ ParserQuery: |
   , DnsFlagsCheckingDisabled:bool
   , DnsFlagsRecursionAvailable:bool
   , DnsFlagsRecursionDesired:bool
-  , DnsFlagsTruncates:bool
+  , DnsFlagsTruncated:bool
   , DnsFlagsZ:bool
   , DnsSessionId:string
   , SessionId: string
@@ -121,16 +125,8 @@ ParserQuery: |
   , DvcId:string
   , EventOriginalType:string
   , AdditionalFields:dynamic
-  , Query:string
-  , QueryType:int
-  , QueryTypeName:string
-  , QueryClass:int
-  , QueryClassName:string
-  , ResponseCode:int
-  , ResponseName:string
-  , ResponseCodeName:string 
-  , Flags:string
   , DvcDomain:string
   , DvcDomainType:string
+  , NetworkProtocolVersion:string
   )[];
   EmptyNewDnsEvents 
