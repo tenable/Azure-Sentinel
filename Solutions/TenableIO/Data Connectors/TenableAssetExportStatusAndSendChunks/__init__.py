@@ -5,6 +5,8 @@ from ..exports_queue import ExportsQueue, ExportsQueueNames
 from ..exports_store import ExportsTableStore, ExportsTableNames
 from ..tenable_helper import TenableIO, TenableStatus, TenableExportType
 
+import azure.durable_functions as df
+
 connection_string = os.environ['AzureWebJobsStorage']
 assets_table_name = ExportsTableNames.TenableAssetExportTable.value
 assets_queue_name = ExportsQueueNames.TenableAssetExportsQueue.value
@@ -55,7 +57,7 @@ def send_chunks_to_queue(exportJobDetails):
         return
 
 
-def main(exportJobId: str) -> object:
+def main(exportJobId: str, instanceId: str, client: df.DurableOrchestrationClient) -> object:
     logging.info('using pyTenable client to check asset export job status')
     logging.info(
         f'checking status at assets/{exportJobId}/status')
@@ -66,8 +68,13 @@ def main(exportJobId: str) -> object:
     logging.info(job_details)
 
     try:
-        job_details['exportJobId'] = exportJobId
-        send_chunks_to_queue(job_details)
+        if job_details['status'] is 'FINISHED':
+            job_details['exportJobId'] = exportJobId
+            send_chunks_to_queue(job_details)
+        else:
+            logging.info('instance id: {}'.format(instanceId))
+            terminate = client.terminate(instanceId)
+            logging.info('instance id: {} is terminated.'.format(instanceId))
     except Exception as e:
         logging.warn('error while sending chunks to queue')
         logging.warn(job_details)
