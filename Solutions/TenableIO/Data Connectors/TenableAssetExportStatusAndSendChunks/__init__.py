@@ -68,7 +68,7 @@ def main(exportJobId: str, instanceId: str, client: df.DurableOrchestrationClien
     logging.info(job_details)
 
     try:
-        if job_details['status'] is 'FINISHED':
+        if job_details['status'] is TenableStatus.finished:
             job_details['exportJobId'] = exportJobId
             send_chunks_to_queue(job_details)
         else:
