@@ -230,7 +230,7 @@
                       },
                       {
                         "name": "REST API Credentials/permissions",
-                        "description": "Both a **TenableAccessKey** and a **TenableSecretKey** is required to access the Tenable REST API. [See the documentation to learn more about API](https://developer.tenable.com/reference#vulnerability-management). Check all [requirements and follow  the instructions](https://docs.tenable.com/tenableio/vulnerabilitymanagement/Content/Settings/GenerateAPIKey.htm) for obtaining credentials."
+                        "description": "Both a **TenableAccessKey** and a **TenableSecretKey** is required to access the Tenable REST API. [See the documentation to learn more about API](https://developer.tenable.com/reference#vulnerability-management). Check all [requirements and follow  the instructions](https://docs.tenable.com/tenableio/Content/Settings/my-account/GenerateAPIKey.htm) for obtaining credentials."
                       }
                     ]
                   },
@@ -245,7 +245,7 @@
                       "description": ">**NOTE:** This data connector depends on a [**Tenable.io parser for vulnerabilities**](https://aka.ms/sentinel-TenableIO-TenableIOVulnerabilities-parser) and a [**Tenable.io parser for assets**](https://aka.ms/sentinel-TenableIO-TenableIOAssets-parser) based on a Kusto Function to work as expected which is deployed with the Microsoft Sentinel Solution."
                     },
                     {
-                      "description": "**STEP 1 - Configuration steps for Tenable.io**\n\n [Follow the instructions](https://docs.tenable.com/tenableio/vulnerabilitymanagement/Content/Settings/GenerateAPIKey.htm) to obtain the required API credentials. \n"
+                      "description": "**STEP 1 - Configuration steps for Tenable.io**\n\n [Follow the instructions](https://docs.tenable.com/tenableio/Content/Settings/my-account/GenerateAPIKey.htm) to obtain the required API credentials. \n"
                     },
                     {
                       "description": "**STEP 2 - Choose ONE from the following two deployment options to deploy the connector and the associated Azure Function App**\n\n>**IMPORTANT:** Before deploying the Workspace data connector, have the Workspace ID and Workspace Primary Key (can be copied from the following).",
@@ -462,7 +462,7 @@
               },
               {
                 "name": "REST API Credentials/permissions",
-                "description": "Both a **TenableAccessKey** and a **TenableSecretKey** is required to access the Tenable REST API. [See the documentation to learn more about API](https://developer.tenable.com/reference#vulnerability-management). Check all [requirements and follow  the instructions](https://docs.tenable.com/tenableio/vulnerabilitymanagement/Content/Settings/GenerateAPIKey.htm) for obtaining credentials."
+                "description": "Both a **TenableAccessKey** and a **TenableSecretKey** is required to access the Tenable REST API. [See the documentation to learn more about API](https://developer.tenable.com/reference#vulnerability-management). Check all [requirements and follow  the instructions](https://docs.tenable.com/tenableio/Content/Settings/my-account/GenerateAPIKey.htm) for obtaining credentials."
               }
             ]
           },
@@ -477,7 +477,7 @@
               "description": ">**NOTE:** This data connector depends on a [**Tenable.io parser for vulnerabilities**](https://aka.ms/sentinel-TenableIO-TenableIOVulnerabilities-parser) and a [**Tenable.io parser for assets**](https://aka.ms/sentinel-TenableIO-TenableIOAssets-parser) based on a Kusto Function to work as expected which is deployed with the Microsoft Sentinel Solution."
             },
             {
-              "description": "**STEP 1 - Configuration steps for Tenable.io**\n\n [Follow the instructions](https://docs.tenable.com/tenableio/vulnerabilitymanagement/Content/Settings/GenerateAPIKey.htm) to obtain the required API credentials. \n"
+              "description": "**STEP 1 - Configuration steps for Tenable.io**\n\n [Follow the instructions](https://docs.tenable.com/tenableio/Content/Settings/my-account/GenerateAPIKey.htm) to obtain the required API credentials. \n"
             },
             {
               "description": "**STEP 2 - Choose ONE from the following two deployment options to deploy the connector and the associated Azure Function App**\n\n>**IMPORTANT:** Before deploying the Workspace data connector, have the Workspace ID and Workspace Primary Key (can be copied from the following).",
@@ -10070,7 +10070,7 @@
       "apiVersion": "2022-01-01-preview",
       "location": "[parameters('workspace-location')]",
       "properties": {
-        "version": "2.0.2",
+        "version": "2.0.3",
         "kind": "Solution",
         "contentSchemaVersion": "2.0.0",
         "contentId": "[variables('_solutionId')]",
