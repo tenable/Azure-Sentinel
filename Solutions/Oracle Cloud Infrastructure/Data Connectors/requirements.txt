@@ -1,3 +1,4 @@
 azure-functions
 oci==2.43.2
 requests==2.26.0
+cryptography>=41.0.5 # not directly required, pinned by Snyk to avoid a vulnerability
