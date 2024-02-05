@@ -21,3 +21,5 @@ version-utils==0.2.2
 wheel==0.38.1
 zope.interface==4.1.1
 azure-identity==1.7.1
+certifi>=2023.7.22 # not directly required, pinned by Snyk to avoid a vulnerability
+pyjwt>=2.4.0 # not directly required, pinned by Snyk to avoid a vulnerability
