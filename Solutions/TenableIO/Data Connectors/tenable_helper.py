@@ -49,6 +49,26 @@ class TenableStatus(Enum):
     sent_to_queue_failed = 'SENT_TO_QUEUE_FAILED'
     sent_to_sub_orchestrator = 'SENT_TO_SUB_ORCHESTRATOR'
 
+
+class TenableJobStatus(Enum):
+    pending = 'PENDING'
+    running = 'RUNNING'
+    canceled = 'CANCELED'
+    failed = 'FAILED'
+    completed = 'COMPLETED'
+
+
+class TenableJobSubStatus(Enum):
+    asset_export_started = 'ASSET_EXPORT_STARTED'
+    vuln_export_started = 'VULN_EXPORT_STARTED'
+    asset_export_finished = 'ASSET_EXPORT_FINISHED'
+    vuln_export_finished = 'VULN_EXPORT_FINISHED'
+    asset_export_canceled = 'ASSET_EXPORT_CANCELED'
+    vuln_export_canceled = 'VULN_EXPORT_CANCELED'
+    asset_export_failed = 'ASSET_EXPORT_FAILED'
+    vuln_export_failed = 'VULN_EXPORT_FAILED'
+
+
 class TenableExportType(Enum):
     asset = 'ASSET_EXPORT_JOB'
     vuln = 'VULN_EXPORT_JOB'
