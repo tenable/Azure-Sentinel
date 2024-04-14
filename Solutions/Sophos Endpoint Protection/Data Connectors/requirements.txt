@@ -1,3 +1,4 @@
 requests==2.25.1
 azure-storage-file-share==12.3.0
 azure-functions==1.6.0
+idna>=3.7 # not directly required, pinned by Snyk to avoid a vulnerability
