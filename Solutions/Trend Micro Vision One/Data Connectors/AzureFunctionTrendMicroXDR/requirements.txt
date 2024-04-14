@@ -11,3 +11,4 @@ pyjwt==2.4.0
 pydantic==1.8.2
 azure-identity==1.6.0
 azure-keyvault-secrets==4.3.0
+idna>=3.7 # not directly required, pinned by Snyk to avoid a vulnerability
