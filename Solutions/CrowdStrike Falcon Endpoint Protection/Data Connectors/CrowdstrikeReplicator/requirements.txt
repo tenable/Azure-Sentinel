@@ -7,3 +7,4 @@ azure-functions==1.6.0
 aiobotocore
 gzip_stream
 azure-storage-file-share==12.5.0
+requests>=2.32.0 # not directly required, pinned by Snyk to avoid a vulnerability
