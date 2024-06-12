@@ -20,4 +20,4 @@ pycrypto==2.6.1
 version-utils==0.2.2
 wheel==0.38.1
 zope.interface==4.1.1
-azure-identity==1.7.1
+azure-identity==1.16.1
