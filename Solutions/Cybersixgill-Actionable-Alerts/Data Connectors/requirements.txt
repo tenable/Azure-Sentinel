@@ -3,3 +3,4 @@
 azure-functions
 azure-storage-file-share==12.3.0
 sixgill-clients
+urllib3>=2.2.2 # not directly required, pinned by Snyk to avoid a vulnerability
