@@ -3,3 +3,4 @@ requests==2.26.0
 python-dateutil==2.8.2
 azure-storage-file-share==12.5.0
 snowflake-connector-python==2.6.1
+setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
