@@ -1,3 +1,4 @@
 azure-functions==1.6.0
 duo-client==4.3.2
 azure-storage-file-share==12.5.0
+setuptools>=70.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
